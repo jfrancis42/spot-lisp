@@ -176,8 +176,7 @@ objects."
 			  (if (not (equal old-loc new-loc))
 			      (progn
 				(setf old-loc new-loc)
-				(bt:with-lock-held (*spots-lock*)
-				  (write-spots-to-file (format nil "~A.log" (local-time:unix-to-timestamp (unix-time (first (last *spots*))))) *spots*))
+				(write-spots-to-file (format nil "~A.log" (local-time:unix-to-timestamp (unix-time (first (last *spots*))))) *spots*)
 				(format t "~A ~A~%" new-loc (street-address (lookup-location (first (last *spots*)))) ))))
        (sleep *sleeptime*))))
 
