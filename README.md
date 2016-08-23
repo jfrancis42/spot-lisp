@@ -9,11 +9,11 @@ password for your shared location page, set the \*feedpassword\* to
 nil (not "nil").
 
 Start the reader thread with (start-spot).  This will update the
-\*locations\* variable with a list of the last fifty location objects,
+\*spots\* variable with a list of the last fifty location objects,
 updating the list every 2.5 minutes (the maximum update rate allowed
-by the free API).  There's a mutex lock for \*locations\* called
-\*locations-lock\*, which it's wise to use when accessing
-\*locations\* (but technically not mandatory).
+by the free API).  There's a mutex lock for \*spots\* called
+\*spots-lock\*, which it's wise to use when accessing
+\*spots\* (but technically not mandatory).
 
 If you want to sit and watch the position data roll in, run
 (show-spots).  This will start an endless loop that updates every time

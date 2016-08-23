@@ -10,7 +10,7 @@
 (defparameter *feedpassword* "PlaceYourSpotSharedSitePasswordHere(orNilIfNoPassword)")
 (defparameter *sleeptime* 30)
 (defparameter *spots* nil)
-(defparameter *locations-lock* (bt:make-lock))
+(defparameter *spots-lock* (bt:make-lock))
 (defparameter *uptodate-thread* nil)
 
 (defun bytes-to-ascii (bytelist)
@@ -100,7 +100,7 @@ from the Spot API."
   (format nil "type:~A time:~A lat:~A lon:~A"
           (message-type n) (local-time:unix-to-timestamp (unix-time n)) (latitude n) (longitude n)))
 
-(defun sort-locations (location-list)
+(defun sort-spots (location-list)
   "Sort a list of location objects."
   (let ((location-list-copy (copy-list location-list)))
     (sort location-list-copy #'<
@@ -154,9 +154,9 @@ objects."
 (defun up-to-dater ()
   "Keep the data structure up to date."
   (loop
-     (bt:with-lock-held (*locations-lock*)
+     (bt:with-lock-held (*spots-lock*)
        (setf *spots*
-             (sort-locations
+             (sort-spots
               (create-location-objects-from-list
                (extract-spot-locations
                 (get-spot-locations *glld* *feedpassword*))))))
@@ -172,11 +172,12 @@ objects."
   "Loop forever and print each new Spot location as it rolls in."
   (let ((old-loc nil) (new-loc t))
     (loop
-       (bt:with-lock-held (*locations-lock*) (setf new-loc (pp (first (last *spots*))))
+       (bt:with-lock-held (*spots-lock*) (setf new-loc (pp (first (last *spots*))))
 			  (if (not (equal old-loc new-loc))
 			      (progn
 				(setf old-loc new-loc)
-				(write-spots-to-file (format nil "~A.log" (local-time:unix-to-timestamp (unix-time (first (last *spots*))))) *spots*)
+				(bt:with-lock-held (*spots-lock*)
+				  (write-spots-to-file (format nil "~A.log" (local-time:unix-to-timestamp (unix-time (first (last *spots*))))) *spots*))
 				(format t "~A ~A~%" new-loc (street-address (lookup-location (first (last *spots*)))) ))))
        (sleep *sleeptime*))))
 
