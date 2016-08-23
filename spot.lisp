@@ -2,13 +2,14 @@
 (ql:quickload :cl-json)
 (ql:quickload :local-time)
 (ql:quickload :bordeaux-threads)
+(ql:quickload :marshal)
 (ql:quickload :quicklisp-slime-helper)
 
 (defparameter *glld* "PlaceYourGLLDThatSpotGivesYouHere")
 (defparameter *google-api-key* "PlaceYourGoogleGeocoderAPIKeyHere")
 (defparameter *feedpassword* "PlaceYourSpotSharedSitePasswordHere(orNilIfNoPassword)")
 (defparameter *sleeptime* 30)
-(defparameter *locations* nil)
+(defparameter *spots* nil)
 (defparameter *locations-lock* (bt:make-lock))
 (defparameter *uptodate-thread* nil)
 
@@ -17,31 +18,6 @@
 drakma:http-request returns the body as a list of bytes instead of a
 string)."
   (map 'string #'code-char bytelist))
-
-(defun lookup-location (loc)
-  "Use the Google Geocoding API to do a reverse geocode lookup (ie,
-convert lat lon to address)."
-  (let* ((url (concatenate 'string "https://maps.googleapis.com/maps/api/geocode/json?latlng="
-			   (format nil "~A" (latitude loc)) ","
-			   (format nil "~A" (longitude loc))
-			   "&key=" *google-api-key*))
-	 (result (drakma:http-request url
-				      :method :get
-				      :accept "application/json"
-				      :content-type "application/json")))
-    (if (> (length result) 0)
-	(json:decode-json-from-string (bytes-to-ascii 
-				       (nth-value 0 result)))
-	nil)))
-
-(defun lat-lon-to-street-address (lat lon)
-  "Convert an arbitrary lat/lon into a street address."
-  (street-address (lookup-location (make-instance 'location :latitude lat :longitude lon))))
-
-(defun street-address (geocoded-result)
-  "Extract the formatted street address from (lookup-location)
-result."
-  (cdr (assoc :formatted--address (cadar geocoded-result))))
 
 (defun get-spot-locations (glld &optional (passwd nil))
   "Get the last fifty entries as JSON data from the Spot server.
@@ -62,18 +38,6 @@ Accepts an optional password for password-protected location feeds."
   "Extract just the location data from the parsed JSON object returned
 from the Spot API."
   (cdr (car (cdr (assoc :messages (cdr (car (cdr (car spot-json)))))))))
-
-(defun create-location-objects-from-list (location-list)
-  "Takes a list of JSON locations (usually
-from (extract-spot-locations)) and returns a list of location
-objects."
-  (map 'list #'(lambda (n) (make-location n)) location-list))
-
-(defun sort-locations (location-list)
-  "Sort a list of location objects."
-  (let ((location-list-copy (copy-list location-list)))
-    (sort location-list-copy #'<
-          :key #'(lambda (n) (unix-time n)))))
 
 (defclass location ()
   ((id :accessor id
@@ -111,6 +75,10 @@ objects."
         :initform nil)
    ))
 
+(defmethod ms:class-persistant-slots ((self location))
+  "This allows for object marshalling."
+  '(id messenger-id unix-time message-type latitude longitude model-id show-custom-msg battery-state hidden))
+
 (defmethod make-location (l)
   "Turn a JSON location into a location object."
   (make-instance 'location
@@ -132,11 +100,62 @@ objects."
   (format nil "type:~A time:~A lat:~A lon:~A"
           (message-type n) (local-time:unix-to-timestamp (unix-time n)) (latitude n) (longitude n)))
 
+(defun sort-locations (location-list)
+  "Sort a list of location objects."
+  (let ((location-list-copy (copy-list location-list)))
+    (sort location-list-copy #'<
+          :key #'(lambda (n) (unix-time n)))))
+
+(defun write-spots-to-file (f spots)
+  "Write the list of spot location objects to a file."
+  (with-open-file (stream f
+			  :direction :output
+			  :if-exists :supersede)
+    (print (ms:marshal spots) stream)))
+
+(defun read-spots-from-file (f)
+  "Read in a previously save list of spot location objects."
+  (let ((l nil))
+    (with-open-file (stream f :direction :input) 
+      (setf l (ms:unmarshal (read stream))))
+    l))
+
+(defun lookup-location (loc)
+  "Use the Google Geocoding API to do a reverse geocode lookup (ie,
+convert lat lon to address)."
+  (let* ((url (concatenate 'string "https://maps.googleapis.com/maps/api/geocode/json?latlng="
+			   (format nil "~A" (latitude loc)) ","
+			   (format nil "~A" (longitude loc))
+			   "&key=" *google-api-key*))
+	 (result (drakma:http-request url
+				      :method :get
+				      :accept "application/json"
+				      :content-type "application/json")))
+    (if (> (length result) 0)
+	(json:decode-json-from-string (bytes-to-ascii 
+				       (nth-value 0 result)))
+	nil)))
+
+(defun street-address (geocoded-result)
+  "Extract the formatted street address from (lookup-location)
+result."
+  (cdr (assoc :formatted--address (cadar geocoded-result))))
+
+(defun lat-lon-to-street-address (lat lon)
+  "Convert an arbitrary lat/lon into a street address."
+  (street-address (lookup-location (make-instance 'location :latitude lat :longitude lon))))
+
+(defun create-location-objects-from-list (location-list)
+  "Takes a list of JSON locations (usually
+from (extract-spot-locations)) and returns a list of location
+objects."
+  (map 'list #'(lambda (n) (make-location n)) location-list))
+
 (defun up-to-dater ()
   "Keep the data structure up to date."
   (loop
      (bt:with-lock-held (*locations-lock*)
-       (setf *locations*
+       (setf *spots*
              (sort-locations
               (create-location-objects-from-list
                (extract-spot-locations
@@ -145,7 +164,7 @@ objects."
 
 (defun start-spot ()
   "Start the thread that reads the latest API data from spot.com every
-2.5 minutes. This keeps the *locations* list up-to-date."
+2.5 minutes. This keeps the *spots* list up-to-date."
   (setf *uptodate-thread* (bt:make-thread (lambda () (up-to-dater)) :name "up-to-dater"))
   (format t "spot update thread is running...~%"))
 
@@ -153,9 +172,11 @@ objects."
   "Loop forever and print each new Spot location as it rolls in."
   (let ((old-loc nil) (new-loc t))
     (loop
-       (bt:with-lock-held (*locations-lock*) (setf new-loc (pp (first (last *locations*))))
+       (bt:with-lock-held (*locations-lock*) (setf new-loc (pp (first (last *spots*))))
 			  (if (not (equal old-loc new-loc))
 			      (progn
 				(setf old-loc new-loc)
-				(format t "~A ~A~%" new-loc (street-address (lookup-location (first (last *locations*)))) ))))
+				(write-spots-to-file (format nil "~A.log" (local-time:unix-to-timestamp (unix-time (first (last *spots*))))) *spots*)
+				(format t "~A ~A~%" new-loc (street-address (lookup-location (first (last *spots*)))) ))))
        (sleep *sleeptime*))))
+
