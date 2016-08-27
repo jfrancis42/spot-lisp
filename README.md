@@ -23,6 +23,15 @@ some point, I'll make the code smart enough to only keep track of the
 deltas, but I need this to work **right now**, so I'm cutting corners.
 I'll fix it later, I promise.
 
+You can also save this program as a compiled binary by calling
+(make-executable).  This calls save-lisp-and-die, which requires that
+no other threads are running (ie, it'll fail if you've already called
+(start-spot) or you're running this code under slime).  The compiled
+binary, called "spots" will be run with the parameters specified in
+the code, and will read the maximum amount of data available via the
+Spot API, then dump that to a file with the time and date of the
+newest spot location as a file name.
+
 I'm also planning to add the ability to read the creds from a file,
 and the ability to run this from cron, where it just grabs the latest
 data and appends any deltas (ie, new spots) to a running log file.
@@ -34,4 +43,3 @@ detection (for network errors, or for lat/lon combinations that fail
 to reverse geocode properly), but it's good enough for now.
 
 Feel free to use and adapt.
-

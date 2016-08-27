@@ -8,6 +8,7 @@
 (defparameter *glld* "PlaceYourGLLDThatSpotGivesYouHere")
 (defparameter *google-api-key* "PlaceYourGoogleGeocoderAPIKeyHere")
 (defparameter *feedpassword* "PlaceYourSpotSharedSitePasswordHere(orNilIfNoPassword)")
+(defparameter *spotdb* "~/spot.db")
 (defparameter *sleeptime* 30)
 (defparameter *spots* nil)
 (defparameter *spots-lock* (bt:make-lock))
@@ -97,8 +98,12 @@ from the Spot API."
 
 (defmethod pp ((n location))
   "Pretty print a location."
-  (format nil "type:~A time:~A lat:~A lon:~A"
-          (message-type n) (local-time:unix-to-timestamp (unix-time n)) (latitude n) (longitude n)))
+  (format nil "lat:~A lon:~A type:~A batt:~A time:~A"
+	  (latitude n)
+	  (longitude n)
+	  (message-type n)
+	  (battery-state n)
+	  (local-time:unix-to-timestamp (unix-time n))))
 
 (defun sort-spots (location-list)
   "Sort a list of location objects."
@@ -115,10 +120,11 @@ from the Spot API."
 
 (defun read-spots-from-file (f)
   "Read in a previously save list of spot location objects."
-  (let ((l nil))
-    (with-open-file (stream f :direction :input) 
-      (setf l (ms:unmarshal (read stream))))
-    l))
+  (let ((spt nil))
+    (if (probe-file f)
+	(with-open-file (stream f :direction :input)
+	  (setf spt (ms:unmarshal (read stream))))
+	nil)))
 
 (defun lookup-location (loc)
   "Use the Google Geocoding API to do a reverse geocode lookup (ie,
@@ -180,3 +186,18 @@ objects."
 				(format t "~A ~A~%" new-loc (street-address (lookup-location (first (last *spots*)))) ))))
        (sleep *sleeptime*))))
 
+(defun one-time ()
+  "Load the largest chunk of spots allowed and write them to a
+file. Designed to be run from something like cron after doing a
+save-lisp-and-die."
+  (setf *spots*
+	(sort-spots
+	 (create-location-objects-from-list
+	  (extract-spot-locations
+	   (get-spot-locations *glld* *feedpassword*)))))
+  (write-spots-to-file (format nil "~A.log" (local-time:unix-to-timestamp (unix-time (first (last *spots*))))) *spots*))
+
+(defun make-executable ()
+  "Write an executable to disk as 'spots' with the current logins,
+passwords, etc."
+  (sb-ext:save-lisp-and-die "spots" :toplevel #'one-time :executable t :purify t :compression 9))
