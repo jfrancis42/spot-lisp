@@ -23,6 +23,11 @@ some point, I'll make the code smart enough to only keep track of the
 deltas, but I need this to work **right now**, so I'm cutting corners.
 I'll fix it later, I promise.
 
+A KML file of the spots can be created by calling the function
+write-kml-file with the file name and list of spots. This file can be
+loaded in Google Earth.  For example: (write-kml-file "my-trip.kml"
+*spots*)
+
 You can also save this program as a compiled binary by calling
 (make-executable).  This calls save-lisp-and-die, which requires that
 no other threads are running (ie, it'll fail if you've already called

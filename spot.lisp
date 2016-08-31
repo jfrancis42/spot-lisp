@@ -8,7 +8,7 @@
 (defparameter *glld* "PlaceYourGLLDThatSpotGivesYouHere")
 (defparameter *google-api-key* "PlaceYourGoogleGeocoderAPIKeyHere")
 (defparameter *feedpassword* "PlaceYourSpotSharedSitePasswordHere(orNilIfNoPassword)")
-(defparameter *spotdb* "~/spot.db")
+(defparameter *logdir* "~/spot-logs/")
 (defparameter *sleeptime* 30)
 (defparameter *spots* nil)
 (defparameter *spots-lock* (bt:make-lock))
@@ -79,6 +79,10 @@ from the Spot API."
 (defmethod ms:class-persistant-slots ((self location))
   "This allows for object marshalling."
   '(id messenger-id unix-time message-type latitude longitude model-id show-custom-msg battery-state hidden))
+
+(defmethod kml ((loc location))
+  "Create a KML entry for this point."
+  (format nil "          ~A,~A,0~%" (longitude loc) (latitude loc)))
 
 (defmethod make-location (l)
   "Turn a JSON location into a location object."
@@ -182,9 +186,46 @@ objects."
 			  (if (not (equal old-loc new-loc))
 			      (progn
 				(setf old-loc new-loc)
-				(write-spots-to-file (format nil "~A.log" (local-time:unix-to-timestamp (unix-time (first (last *spots*))))) *spots*)
+				(write-spots-to-file (format nil "~A~A.log" *logdir* (local-time:unix-to-timestamp (unix-time (first (last *spots*))))) *spots*)
 				(format t "~A ~A~%" new-loc (street-address (lookup-location (first (last *spots*)))) ))))
        (sleep *sleeptime*))))
+
+(defun write-kml-file (file spots)
+  "Create a KML file with the supplied list of spots in it."
+  (with-open-file (stream file
+			  :direction :output
+			  :if-exists :supersede)
+
+    (format stream "<?xml version=\"1.0\" encoding=\"UTF-8\"?>~%")
+    (format stream "<kml xmlns=\"http://www.opengis.net/kml/2.2\">~%")
+    (format stream "  <Document>~%")
+    (format stream "    <name>Spot Messenger Locations</name>~%")
+    (format stream "    <description>Spot Messenger Locations</description>~%")
+    (format stream "    <Style id=\"yellowLineGreenPoly\">~%")
+    (format stream "      <LineStyle>~%")
+    (format stream "        <color>7f00ffff</color>~%")
+    (format stream "        <width>4</width>~%")
+    (format stream "      </LineStyle>~%")
+    (format stream "      <PolyStyle>~%")
+    (format stream "        <color>7f00ff00</color>~%")
+    (format stream "      </PolyStyle>~%")
+    (format stream "    </Style>~%")
+    (format stream "    <Placemark>~%")
+    (format stream "      <name>Absolute Extruded</name>~%")
+    (format stream "      <description>Transparent green wall with yellow outlines</description>~%")
+    (format stream "      <styleUrl>#yellowLineGreenPoly</styleUrl>~%")
+    (format stream "      <LineString>~%")
+    (format stream "        <extrude>1</extrude>~%")
+    (format stream "        <tessellate>1</tessellate>~%")
+    (format stream "        <altitudeMode>relative</altitudeMode>~%")
+    (format stream "        <coordinates>~%")
+    (loop for n in spots
+       do (format stream "~A" (kml n)))
+    (format stream "        </coordinates>~%")
+    (format stream "      </LineString>~%")
+    (format stream "    </Placemark>~%")
+    (format stream "  </Document>~%")
+    (format stream "</kml>~%")))
 
 (defun one-time ()
   "Load the largest chunk of spots allowed and write them to a
@@ -195,7 +236,7 @@ save-lisp-and-die."
 	 (create-location-objects-from-list
 	  (extract-spot-locations
 	   (get-spot-locations *glld* *feedpassword*)))))
-  (write-spots-to-file (format nil "~A.log" (local-time:unix-to-timestamp (unix-time (first (last *spots*))))) *spots*))
+  (write-spots-to-file (format nil "~A~A.log" *logdir* (local-time:unix-to-timestamp (unix-time (first (last *spots*))))) *spots*))
 
 (defun make-executable ()
   "Write an executable to disk as 'spots' with the current logins,
