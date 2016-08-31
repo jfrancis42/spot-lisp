@@ -1,6 +1,5 @@
 *.log
 creds.lisp
-*.asd
 *.kml
 spots*
 
