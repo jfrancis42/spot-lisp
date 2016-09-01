@@ -1,30 +1,20 @@
-(ql:quickload :drakma)
-(ql:quickload :cl-json)
-(ql:quickload :local-time)
-(ql:quickload :bordeaux-threads)
-(ql:quickload :marshal)
-(ql:quickload :quicklisp-slime-helper)
+;;;; spot.lisp
 
-(defparameter *glld* "PlaceYourGLLDThatSpotGivesYouHere")
-(defparameter *google-api-key* "PlaceYourGoogleGeocoderAPIKeyHere")
-(defparameter *feedpassword* "PlaceYourSpotSharedSitePasswordHere(orNilIfNoPassword)")
-(defparameter *logdir* "~/spot-logs/")
-(defparameter *sleeptime* 30)
+(in-package #:spot)
+
 (defparameter *spots* nil)
 (defparameter *spots-lock* (bt:make-lock))
 (defparameter *uptodate-thread* nil)
 
 (defun bytes-to-ascii (bytelist)
-  "Turn a list of bytes into string (for some very annoying reason,
-drakma:http-request returns the body as a list of bytes instead of a
-string)."
+  "Turn a list of bytes into string."
   (map 'string #'code-char bytelist))
 
-(defun get-spot-locations (glld &optional (passwd nil))
+(defun get-spot-locations (feed-glld &optional (passwd nil))
   "Get the last fifty entries as JSON data from the Spot server.
 Accepts an optional password for password-protected location feeds."
   (let ((feed (concatenate 'string "https://api.findmespot.com/spot-main-web/consumer/rest-api/2.0/public/feed/"
-			   glld "/message.json")))
+			   feed-glld "/message.json")))
     (if passwd (setf feed (concatenate 'string feed "?feedPassword=" passwd)))
     (let ((result (drakma:http-request feed
                                        :method :get
@@ -76,14 +66,6 @@ from the Spot API."
         :initform nil)
    ))
 
-(defmethod ms:class-persistant-slots ((self location))
-  "This allows for object marshalling."
-  '(id messenger-id unix-time message-type latitude longitude model-id show-custom-msg battery-state hidden))
-
-(defmethod kml ((loc location))
-  "Create a KML entry for this point."
-  (format nil "          ~A,~A,0~%" (longitude loc) (latitude loc)))
-
 (defmethod make-location (l)
   "Turn a JSON location into a location object."
   (make-instance 'location
@@ -115,28 +97,13 @@ from the Spot API."
     (sort location-list-copy #'<
           :key #'(lambda (n) (unix-time n)))))
 
-(defun write-spots-to-file (f spots)
-  "Write the list of spot location objects to a file."
-  (with-open-file (stream f
-			  :direction :output
-			  :if-exists :supersede)
-    (print (ms:marshal spots) stream)))
-
-(defun read-spots-from-file (f)
-  "Read in a previously save list of spot location objects."
-  (let ((spt nil))
-    (if (probe-file f)
-	(with-open-file (stream f :direction :input)
-	  (setf spt (ms:unmarshal (read stream))))
-	nil)))
-
-(defun lookup-location (loc)
+(defun lookup-location (loc google-api-key)
   "Use the Google Geocoding API to do a reverse geocode lookup (ie,
 convert lat lon to address)."
   (let* ((url (concatenate 'string "https://maps.googleapis.com/maps/api/geocode/json?latlng="
 			   (format nil "~A" (latitude loc)) ","
 			   (format nil "~A" (longitude loc))
-			   "&key=" *google-api-key*))
+			   "&key=" google-api-key))
 	 (result (drakma:http-request url
 				      :method :get
 				      :accept "application/json"
@@ -151,9 +118,13 @@ convert lat lon to address)."
 result."
   (cdr (assoc :formatted--address (cadar geocoded-result))))
 
-(defun lat-lon-to-street-address (lat lon)
+(defun lat-lon-to-street-address (lat lon google-api-key)
   "Convert an arbitrary lat/lon into a street address."
-  (street-address (lookup-location (make-instance 'location :latitude lat :longitude lon))))
+  (street-address (lookup-location (make-instance 'location :latitude lat :longitude lon) google-api-key)))
+
+(defun spot-street-address (spot google-api-key)
+  "Convert a spot location into a street address."
+  (street-address (lookup-location spot google-api-key)))
 
 (defun create-location-objects-from-list (location-list)
   "Takes a list of JSON locations (usually
@@ -161,84 +132,39 @@ from (extract-spot-locations)) and returns a list of location
 objects."
   (map 'list #'(lambda (n) (make-location n)) location-list))
 
-(defun up-to-dater ()
+(defun get-all-spots-api (feed-glld feed-passwd)
+  "Fetch the latest batch of spots from the Spot API."
+  (sort-spots
+   (create-location-objects-from-list
+    (extract-spot-locations
+     (get-spot-locations feed-glld feed-passwd)))))
+
+(defun get-newest-spot-api (feed-glld feed-passwd)
+  "Fetch the latest spot from the Spot API."
+  (first
+   (last
+    (sort-spots
+     (create-location-objects-from-list
+      (extract-spot-locations
+       (get-spot-locations feed-glld feed-passwd)))))))
+
+(defun up-to-dater (feed-glld feed-passwd)
   "Keep the data structure up to date."
   (loop
      (bt:with-lock-held (*spots-lock*)
-       (setf *spots*
-             (sort-spots
-              (create-location-objects-from-list
-               (extract-spot-locations
-                (get-spot-locations *glld* *feedpassword*))))))
+       (setf *spots* (get-all-spots-api feed-glld feed-passwd)))
      (sleep (* 60 2.5))))
 
-(defun start-spot ()
+(defun start-spot (feed-glld feed-passwd)
   "Start the thread that reads the latest API data from spot.com every
 2.5 minutes. This keeps the *spots* list up-to-date."
-  (setf *uptodate-thread* (bt:make-thread (lambda () (up-to-dater)) :name "up-to-dater"))
+  (setf *uptodate-thread* (bt:make-thread (lambda () (up-to-dater feed-glld feed-passwd)) :name "up-to-dater"))
   (format t "spot update thread is running...~%"))
 
-(defun watch-spots ()
-  "Loop forever and print each new Spot location as it rolls in."
-  (let ((old-loc nil) (new-loc t))
-    (loop
-       (bt:with-lock-held (*spots-lock*) (setf new-loc (pp (first (last *spots*))))
-			  (if (not (equal old-loc new-loc))
-			      (progn
-				(setf old-loc new-loc)
-				(write-spots-to-file (format nil "~A~A.log" *logdir* (local-time:unix-to-timestamp (unix-time (first (last *spots*))))) *spots*)
-				(format t "~A ~A~%" new-loc (street-address (lookup-location (first (last *spots*)))) ))))
-       (sleep *sleeptime*))))
+(defun get-all-spots-local ()
+  "Returns a list of all spots (assuming the thread is running)."
+  *spots*)
 
-(defun write-kml-file (file spots)
-  "Create a KML file with the supplied list of spots in it."
-  (with-open-file (stream file
-			  :direction :output
-			  :if-exists :supersede)
-
-    (format stream "<?xml version=\"1.0\" encoding=\"UTF-8\"?>~%")
-    (format stream "<kml xmlns=\"http://www.opengis.net/kml/2.2\">~%")
-    (format stream "  <Document>~%")
-    (format stream "    <name>Spot Messenger Locations</name>~%")
-    (format stream "    <description>Spot Messenger Locations</description>~%")
-    (format stream "    <Style id=\"yellowLineGreenPoly\">~%")
-    (format stream "      <LineStyle>~%")
-    (format stream "        <color>7f00ffff</color>~%")
-    (format stream "        <width>4</width>~%")
-    (format stream "      </LineStyle>~%")
-    (format stream "      <PolyStyle>~%")
-    (format stream "        <color>7f00ff00</color>~%")
-    (format stream "      </PolyStyle>~%")
-    (format stream "    </Style>~%")
-    (format stream "    <Placemark>~%")
-    (format stream "      <name>Absolute Extruded</name>~%")
-    (format stream "      <description>Transparent green wall with yellow outlines</description>~%")
-    (format stream "      <styleUrl>#yellowLineGreenPoly</styleUrl>~%")
-    (format stream "      <LineString>~%")
-    (format stream "        <extrude>1</extrude>~%")
-    (format stream "        <tessellate>1</tessellate>~%")
-    (format stream "        <altitudeMode>relative</altitudeMode>~%")
-    (format stream "        <coordinates>~%")
-    (loop for n in spots
-       do (format stream "~A" (kml n)))
-    (format stream "        </coordinates>~%")
-    (format stream "      </LineString>~%")
-    (format stream "    </Placemark>~%")
-    (format stream "  </Document>~%")
-    (format stream "</kml>~%")))
-
-(defun one-time ()
-  "Load the largest chunk of spots allowed and write them to a
-file. Designed to be run from something like cron after doing a
-save-lisp-and-die."
-  (setf *spots*
-	(sort-spots
-	 (create-location-objects-from-list
-	  (extract-spot-locations
-	   (get-spot-locations *glld* *feedpassword*)))))
-  (write-spots-to-file (format nil "~A~A.log" *logdir* (local-time:unix-to-timestamp (unix-time (first (last *spots*))))) *spots*))
-
-(defun make-executable ()
-  "Write an executable to disk as 'spots' with the current logins,
-passwords, etc."
-  (sb-ext:save-lisp-and-die "spots" :toplevel #'one-time :executable t :purify t :compression 9))
+(defun get-newest-spot-local ()
+  "Returns the newest spot (assuming the thread is running)."
+  (first (last *spots*)))
