@@ -3,7 +3,7 @@
 (asdf:defsystem #:spot
   :description "Describe spot here"
   :author "Your Name <your.name@example.com>"
-  :license "Specify license here"
+  :license "MIT, see file LICENSE"
   :depends-on (#:drakma
                #:cl-json
                #:local-time
