@@ -1,4 +1,4 @@
-# spot
+# spot-lisp
 A Common Lisp client for reading location data from the public findmespot.com API.
 
 This library is capable of running in two different modes. It can fetch Spot data on demand from the official Spot API, or it can start a thread that keeps a local copy of your Spot data and updates it every 150 seconds (the shortest update rate allowed by Spot). The advantages of using the local cached data include quicker results and not having to manage repeated lookups to obtain new/current data. The down side is that the thread code is not yet 100% reliable, and the thread dies if there is any interruption in network connectivity. This is on the ToDo list to fix (or at least handle the error properly and continue).
@@ -36,5 +36,12 @@ The fields in each location object match those described in the Spot API documen
 ```
 CL-USER> (spot:latitude (get-newest-spot-local))
 47.79126
+CL-USER>
+```
+Last, but not least, (pp ...) is a method that will return a nice one-line summary string of the current object. Example:
+
+```
+CL-USER> (spot:pp (get-newest-spot-local))
+"lat:42.49026 lon:-102.14314 type:TRACK batt:GOOD time:2016-08-30T07:42:30.000000-07:00"
 CL-USER>
 ```
