@@ -9,5 +9,17 @@
 	   :get-all-spots-local
 	   :get-newest-spot-api
 	   :get-newest-spot-local
-	   :start-spot))
+	   :start-spot
+	   :id
+	   :messenger-id
+	   :unix-time
+	   :message-type
+	   :latitude
+	   :longtude
+	   :model-id
+	   :show-custom-msg
+	   :date-time
+	   :battery-state
+	   :hidden
+	   ))
 
