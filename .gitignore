@@ -1,6 +1,4 @@
 *.log
-creds.lisp
 *.kml
-spots*
 .DS_Store
 
