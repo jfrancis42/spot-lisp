@@ -1,8 +1,8 @@
 ;;;; spot.asd
 
 (asdf:defsystem #:spot
-  :description "Describe spot here"
-  :author "Your Name <your.name@example.com>"
+  :description "A library for extracting SPOT data from the findmespot.com API."
+  :author "Jeff Francis <jeff@gritch.org>"
   :license "MIT, see file LICENSE"
   :depends-on (#:drakma
                #:cl-json
