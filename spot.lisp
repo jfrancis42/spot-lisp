@@ -30,63 +30,28 @@ Accepts an optional password for password-protected location feeds."
 from the Spot API."
   (cdr (car (cdr (assoc :messages (cdr (car (cdr (car spot-json)))))))))
 
-(defclass location ()
-  ((id :accessor id
-         :initarg :id
-         :initform nil)
-   (messenger-id :accessor messenger-id
-                 :initarg :messenger-id
-                 :initform nil)
-   (unix-time :accessor unix-time
-        :initarg :unix-time
-        :initform nil)
-   (message-type :accessor message-type
-        :initarg :message-type
-        :initform nil)
-   (latitude :accessor latitude
-        :initarg :latitude
-        :initform nil)
-   (longitude :accessor longitude
-        :initarg :longitude
-        :initform nil)
-   (model-id :accessor model-id
-        :initarg :model-id
-        :initform nil)
-   (show-custom-msg :accessor show-custom-msg
-        :initarg :show-custom-msg
-        :initform nil)
-   (date-time :accessor date-time
-        :initarg :date-time
-        :initform nil)
-   (battery-state :accessor battery-state
-        :initarg :battery-state
-        :initform nil)
-   (hidden :accessor hidden
-        :initarg :hidden
-        :initform nil)
-   ))
-
 (defmethod make-location (l)
   "Turn a JSON location into a location object."
-  (make-instance 'location
+  (make-instance 'spot-point
                  :id (cdr (assoc :id l))
                  :messenger-id (cdr (assoc :messenger-id l))
                  :unix-time (cdr (assoc :unix-time l))
                  :message-type (cdr (assoc :message-type l))
-                 :latitude (cdr (assoc :latitude l))
-                 :longitude (cdr (assoc :longitude l))
+                 :lat (cdr (assoc :latitude l))
+                 :lon (cdr (assoc :longitude l))
                  :model-id (cdr (assoc :model-id l))
                  :show-custom-msg (cdr (assoc :show-custom-msg l))
                  :date-time (cdr (assoc :date-time l))
                  :battery-state (cdr (assoc :battery-state l))
                  :hidden (cdr (assoc :hidden l))
+		 :creation-source point-spot
                  ))
 
-(defmethod pp ((n location))
-  "Pretty print a location."
+(defmethod short-print ((n spot-point))
+  "Print a short bit of location info."
   (format nil "lat:~A lon:~A type:~A batt:~A time:~A"
-	  (latitude n)
-	  (longitude n)
+	  (point-lat n)
+	  (point-lon n)
 	  (message-type n)
 	  (battery-state n)
 	  (local-time:unix-to-timestamp (unix-time n))))
@@ -101,8 +66,8 @@ from the Spot API."
   "Use the Google Geocoding API to do a reverse geocode lookup (ie,
 convert lat lon to address)."
   (let* ((url (concatenate 'string "https://maps.googleapis.com/maps/api/geocode/json?latlng="
-			   (format nil "~A" (latitude loc)) ","
-			   (format nil "~A" (longitude loc))
+			   (format nil "~A" (point-lat loc)) ","
+			   (format nil "~A" (point-lon loc))
 			   "&key=" google-api-key))
 	 (result (drakma:http-request url
 				      :method :get
@@ -120,7 +85,7 @@ result."
 
 (defun lat-lon-to-street-address (lat lon google-api-key)
   "Convert an arbitrary lat/lon into a street address."
-  (street-address (lookup-location (make-instance 'location :latitude lat :longitude lon) google-api-key)))
+  (street-address (lookup-location (make-instance 'spot-point :latitude lat :longitude lon) google-api-key)))
 
 (defun spot-street-address (spot google-api-key)
   "Convert a spot location into a street address."

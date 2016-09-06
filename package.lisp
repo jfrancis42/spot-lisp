@@ -2,6 +2,16 @@
 
 (defpackage #:spot
   (:use #:cl)
+  (:import-from :aviation-formulary
+		:pp
+		:spot-point
+		:point-lat
+		:point-lon
+		:message-type
+		:battery-state
+		:unix-time
+		:creation-source
+		:point-spot)
   (:export :pp
 	   :lat-lon-to-street-address
 	   :spot-street-address

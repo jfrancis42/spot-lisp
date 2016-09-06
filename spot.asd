@@ -7,7 +7,8 @@
   :depends-on (#:drakma
                #:cl-json
                #:local-time
-               #:bordeaux-threads)
+               #:bordeaux-threads
+	       #:aviation-formulary)
   :serial t
   :components ((:file "package")
                (:file "spot")))
