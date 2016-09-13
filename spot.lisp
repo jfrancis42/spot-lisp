@@ -62,34 +62,9 @@ from the Spot API."
     (sort location-list-copy #'<
           :key #'(lambda (n) (unix-time n)))))
 
-(defun lookup-location (loc google-api-key)
-  "Use the Google Geocoding API to do a reverse geocode lookup (ie,
-convert lat lon to address)."
-  (let* ((url (concatenate 'string "https://maps.googleapis.com/maps/api/geocode/json?latlng="
-			   (format nil "~A" (point-lat loc)) ","
-			   (format nil "~A" (point-lon loc))
-			   "&key=" google-api-key))
-	 (result (drakma:http-request url
-				      :method :get
-				      :accept "application/json"
-				      :content-type "application/json")))
-    (if (> (length result) 0)
-	(json:decode-json-from-string (bytes-to-ascii 
-				       (nth-value 0 result)))
-	nil)))
-
-(defun street-address (geocoded-result)
-  "Extract the formatted street address from (lookup-location)
-result."
-  (cdr (assoc :formatted--address (cadar geocoded-result))))
-
-(defun lat-lon-to-street-address (lat lon google-api-key)
-  "Convert an arbitrary lat/lon into a street address."
-  (street-address (lookup-location (make-instance 'spot-point :latitude lat :longitude lon) google-api-key)))
-
 (defun spot-street-address (spot google-api-key)
   "Convert a spot location into a street address."
-  (street-address (lookup-location spot google-api-key)))
+  (geocode:extract-street-address-from-json (lookup-location spot google-api-key)))
 
 (defun create-location-objects-from-list (location-list)
   "Takes a list of JSON locations (usually

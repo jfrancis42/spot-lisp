@@ -12,6 +12,11 @@
 		:unix-time
 		:creation-source
 		:point-spot)
+  (:import-from :geocode
+		:lookup-location
+		:extract-street-address-from-json
+		:lat-lon-to-location
+		:lat-lon-to-street-address)
   (:export :pp
 	   :lat-lon-to-street-address
 	   :spot-street-address

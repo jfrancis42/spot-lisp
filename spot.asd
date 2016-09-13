@@ -6,6 +6,7 @@
   :license "MIT, see file LICENSE"
   :depends-on (#:drakma
                #:cl-json
+	       #:geocode
                #:local-time
                #:bordeaux-threads
 	       #:aviation-formulary)
