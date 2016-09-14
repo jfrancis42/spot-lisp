@@ -5,6 +5,106 @@
 (defparameter *spots* nil)
 (defparameter *spots-lock* (bt:make-lock))
 (defparameter *uptodate-thread* nil)
+(defconstant point-spot 3)
+
+;;  Decendant of aviation-formlary's 2d-point.  Adds fields for SPOT
+;;  service.
+(defclass spot-point (af:2d-point)
+  ((id :accessor id
+         :initarg :id
+         :initform nil)
+   (messenger-id :accessor messenger-id
+                 :initarg :messenger-id
+                 :initform nil)
+   (unix-time :accessor unix-time
+        :initarg :unix-time
+        :initform nil)
+   (message-type :accessor message-type
+        :initarg :message-type
+        :initform nil)
+   (model-id :accessor model-id
+        :initarg :model-id
+        :initform nil)
+   (show-custom-msg :accessor show-custom-msg
+        :initarg :show-custom-msg
+        :initform nil)
+   (date-time :accessor date-time
+        :initarg :date-time
+        :initform nil)
+   (battery-state :accessor battery-state
+        :initarg :battery-state
+        :initform nil)
+   (hidden :accessor hidden
+        :initarg :hidden
+        :initform nil)
+   ))
+
+(defmethod point-serialize ((p spot-point))
+  "Serialize a SPOT point."
+  (append
+   (list
+    '(type spot-point)
+    (list 'lat (point-lat p))
+    (list 'lon (point-lon p))
+    (list 'datum (point-datum p))
+    (list 'id (id p))
+    (list 'unix-time (unix-time p))
+    (list 'message-type (message-type p))
+    (list 'model-id (model-id p))
+    (list 'show-custom-msg (show-custom-msg p))
+    (list 'date-time (date-time p))
+    (list 'battery-state (battery-state p))
+    (list 'hidden (hidden p))
+    )
+   (af:point-metadata-serialize p)))
+
+(defmethod pp ((p spot-point))
+  "Pretty print a spot point."
+  (format t "Name:  ~A~%" (point-name p))
+  (format t "Descr:  ~A~%" (point-description p))
+  (format t "Lat:  ~F~%" (point-lat p))
+  (format t "Lon:  ~F~%" (point-lon p))
+  (format t "Id:  ~F~%" (id p))
+  (format t "Unix-Time:  ~F~%" (unix-time p))
+  (format t "Message Type:  ~F~%" (message-type p))
+  (format t "Model Id:  ~F~%" (model-id p))
+  (format t "Show Custom Msg:  ~F~%" (show-custom-msg p))
+  (format t "Date-Time:  ~F~%" (date-time p))
+  (format t "Battery State:  ~F~%" (battery-state p))
+  (format t "Hidden:  ~F~%" (hidden p))
+  (format t "Datum:  ~A~%" (point-datum p)))
+
+(defmethod point-deserialize-method ((p spot-point) point-data)
+  "Create an object from the data dumped by 'point-serialize'.  If the
+optional point-type value is supplied, the created object will be of
+that type."
+  (point-metadata-deserialize-method p point-data)
+  (mapcar #'(lambda (n)
+	      (cond
+	       ((equal (first n) 'lat)
+		(setf (point-lat p) (second n)))
+	       ((equal (first n) 'lon)
+		(setf (point-lon p) (second n)))
+	       ((equal (first n) 'id)
+		(setf (id p) (second n)))
+	       ((equal (first n) 'unix-time)
+		(setf (unix-time p) (second n)))
+	       ((equal (first n) 'message-type)
+		(setf (message-type p) (second n)))
+	       ((equal (first n) 'model-id)
+		(setf (model-id p) (second n)))
+	       ((equal (first n) 'show-custom-msg)
+		(setf (show-custom-msg p) (second n)))
+	       ((equal (first n) 'date-time)
+		(setf (date-time p) (second n)))
+	       ((equal (first n) 'battery-state)
+		(setf (battery-state p) (second n)))
+	       ((equal (first n) 'hidden)
+		(setf (hidden p) (second n)))
+	       ((equal (first n) 'datum)
+		(setf (point-datum p) (second n)))
+	       ))
+	  point-data))
 
 (defun bytes-to-ascii (bytelist)
   "Turn a list of bytes into string."
