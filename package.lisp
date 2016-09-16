@@ -4,6 +4,9 @@
   (:use #:cl)
   (:import-from :aviation-formulary
 		:pp
+		:point-name
+		:point-description
+		:point-datum
 		:spot-point
 		:point-lat
 		:point-lon
