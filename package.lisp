@@ -4,23 +4,42 @@
   (:use #:cl)
   (:import-from :aviation-formulary
 		:pp
+		:point-serial-number
+		:point-creation-time
+		:point-creation-source
 		:point-name
 		:point-description
-		:point-datum
-		:spot-point
 		:point-lat
 		:point-lon
+		:point-datum
+		:point-alt
 		:message-type
-		:battery-state
-		:unix-time
-		:creation-source
-		:point-spot)
+		:unix-time)
   (:import-from :geocode
 		:lookup-location
 		:extract-street-address-from-json
 		:lat-lon-to-location
 		:lat-lon-to-street-address)
   (:export :pp
+	   :point-serial-number
+	   :point-creation-time
+	   :point-creation-source
+	   :point-name
+	   :point-description
+	   :point-lat
+	   :point-lon
+	   :point-datum
+	   :point-alt
+	   :point-id
+	   :point-messenger-id
+	   :point-unix-time
+	   :point-message-type
+	   :point-model-id
+	   :point-show-custom-msg
+	   :point-date-time
+	   :point-battery-state
+	   :point-hidden
+	   :spot-point
 	   :lat-lon-to-street-address
 	   :spot-street-address
 	   :get-all-spots-api
@@ -29,15 +48,5 @@
 	   :get-newest-spot-local
 	   :start-spot
 	   :id
-	   :messenger-id
-	   :unix-time
-	   :message-type
-	   :latitude
-	   :longtude
-	   :model-id
-	   :show-custom-msg
-	   :date-time
-	   :battery-state
-	   :hidden
 	   ))
 
