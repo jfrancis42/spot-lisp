@@ -106,10 +106,6 @@ that type."
 	       ))
 	  point-data))
 
-(defun bytes-to-ascii (bytelist)
-  "Turn a list of bytes into string."
-  (map 'string #'code-char bytelist))
-
 (defun get-spot-locations (feed-glld &optional (passwd nil))
   "Get the last fifty entries as JSON data from the Spot server.
 Accepts an optional password for password-protected location feeds."
@@ -121,7 +117,7 @@ Accepts an optional password for password-protected location feeds."
                                        :accept "application/json"
                                        :content-type "application/json")))
       (if (> (length result) 0)
-          (json:decode-json-from-string (bytes-to-ascii 
+          (json:decode-json-from-string (babel:octets-to-string 
                                          (nth-value 0 result)))
           nil))))
 
