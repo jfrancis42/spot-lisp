@@ -42,6 +42,7 @@
 	   :spot-point
 	   :lat-lon-to-street-address
 	   :spot-street-address
+	   :spot-short-print
 	   :get-all-spots-api
 	   :get-all-spots-local
 	   :get-newest-spot-api

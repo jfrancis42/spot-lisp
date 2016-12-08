@@ -7,7 +7,7 @@
 (defparameter *uptodate-thread* nil)
 (defconstant point-spot 3)
 
-;;  Decendant of aviation-formlary's 2d-point.  Adds fields for SPOT
+;;  Descendant of aviation-formlary's 2d-point.  Adds fields for SPOT
 ;;  service.
 (defclass spot-point (af:2d-point)
   ((id :accessor point-id
@@ -124,7 +124,10 @@ Accepts an optional password for password-protected location feeds."
 (defun extract-spot-locations (spot-json)
   "Extract just the location data from the parsed JSON object returned
 from the Spot API."
-  (cdr (car (cdr (assoc :messages (cdr (car (cdr (car spot-json)))))))))
+  (cdr (assoc :message
+	      (cdr (assoc :messages
+			  (cdr (assoc :feed-message-response
+				      (cdr (assoc :response spot-json)))))))))
 
 (defmethod make-location (l)
   "Turn a JSON location into a location object."
