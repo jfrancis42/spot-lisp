@@ -7,36 +7,41 @@
 (defparameter *uptodate-thread* nil)
 (defconstant point-spot 3)
 
+(defmacro cdr-assoc (name alist)
+  "Replaces '(cdr (assoc name alist))' because it's used a bajillion
+times when doing API stuff."
+  `(cdr (assoc ,name ,alist :test #'equal)))
+
 ;;  Descendant of aviation-formlary's 2d-point.  Adds fields for SPOT
 ;;  service.
 (defclass spot-point (af:2d-point)
   ((id :accessor point-id
-         :initarg :id
-         :initform nil)
+       :initarg :id
+       :initform nil)
    (messenger-id :accessor point-messenger-id
                  :initarg :messenger-id
                  :initform nil)
    (unix-time :accessor point-unix-time
-        :initarg :unix-time
-        :initform nil)
+              :initarg :unix-time
+              :initform nil)
    (message-type :accessor point-message-type
-        :initarg :message-type
-        :initform nil)
+		 :initarg :message-type
+		 :initform nil)
    (model-id :accessor point-model-id
-        :initarg :model-id
-        :initform nil)
+             :initarg :model-id
+             :initform nil)
    (show-custom-msg :accessor point-show-custom-msg
-        :initarg :show-custom-msg
-        :initform nil)
+		    :initarg :show-custom-msg
+		    :initform nil)
    (date-time :accessor point-date-time
-        :initarg :date-time
-        :initform nil)
+              :initarg :date-time
+              :initform nil)
    (battery-state :accessor point-battery-state
-        :initarg :battery-state
-        :initform nil)
+		  :initarg :battery-state
+		  :initform nil)
    (hidden :accessor point-hidden
-        :initarg :hidden
-        :initform nil)
+           :initarg :hidden
+           :initform nil)
    ))
 
 (defmethod point-serialize ((p spot-point))
@@ -81,68 +86,75 @@ that type."
   (point-metadata-deserialize-method p point-data)
   (mapcar #'(lambda (n)
 	      (cond
-	       ((equal (first n) 'lat)
-		(setf (point-lat p) (second n)))
-	       ((equal (first n) 'lon)
-		(setf (point-lon p) (second n)))
-	       ((equal (first n) 'id)
-		(setf (point-id p) (second n)))
-	       ((equal (first n) 'unix-time)
-		(setf (point-unix-time p) (second n)))
-	       ((equal (first n) 'message-type)
-		(setf (point-message-type p) (second n)))
-	       ((equal (first n) 'model-id)
-		(setf (point-model-id p) (second n)))
-	       ((equal (first n) 'show-custom-msg)
-		(setf (point-show-custom-msg p) (second n)))
-	       ((equal (first n) 'date-time)
-		(setf (point-date-time p) (second n)))
-	       ((equal (first n) 'battery-state)
-		(setf (point-battery-state p) (second n)))
-	       ((equal (first n) 'hidden)
-		(setf (point-hidden p) (second n)))
-	       ((equal (first n) 'datum)
-		(setf (point-datum p) (second n)))
-	       ))
+		((equal (first n) 'lat)
+		 (setf (point-lat p) (second n)))
+		((equal (first n) 'lon)
+		 (setf (point-lon p) (second n)))
+		((equal (first n) 'id)
+		 (setf (point-id p) (second n)))
+		((equal (first n) 'unix-time)
+		 (setf (point-unix-time p) (second n)))
+		((equal (first n) 'message-type)
+		 (setf (point-message-type p) (second n)))
+		((equal (first n) 'model-id)
+		 (setf (point-model-id p) (second n)))
+		((equal (first n) 'show-custom-msg)
+		 (setf (point-show-custom-msg p) (second n)))
+		((equal (first n) 'date-time)
+		 (setf (point-date-time p) (second n)))
+		((equal (first n) 'battery-state)
+		 (setf (point-battery-state p) (second n)))
+		((equal (first n) 'hidden)
+		 (setf (point-hidden p) (second n)))
+		((equal (first n) 'datum)
+		 (setf (point-datum p) (second n)))
+		))
 	  point-data))
 
 (defun get-spot-locations (feed-glld &optional (passwd nil))
   "Get the last fifty entries as JSON data from the Spot server.
 Accepts an optional password for password-protected location feeds."
-  (let ((feed (concatenate 'string "https://api.findmespot.com/spot-main-web/consumer/rest-api/2.0/public/feed/"
-			   feed-glld "/message.json")))
-    (if passwd (setf feed (concatenate 'string feed "?feedPassword=" passwd)))
-    (let ((result (drakma:http-request feed
-                                       :method :get
-                                       :accept "application/json"
-                                       :content-type "application/json")))
+  (let
+      ((feed
+	(concatenate
+	 'string
+	 "https://api.findmespot.com/spot-main-web/consumer/rest-api/2.0/public/feed/"
+	 feed-glld "/message.json")))
+    (if passwd
+	(setf feed (concatenate 'string feed "?feedPassword=" passwd)))
+    (let ((result (drakma:http-request
+		   feed
+                   :method :get
+                   :accept "application/json"
+                   :content-type "application/json")))
       (if (> (length result) 0)
-          (json:decode-json-from-string (babel:octets-to-string 
-                                         (nth-value 0 result)))
+          (json:decode-json-from-string
+	   (babel:octets-to-string 
+            (nth-value 0 result)))
           nil))))
 
 (defun extract-spot-locations (spot-json)
   "Extract just the location data from the parsed JSON object returned
 from the Spot API."
-  (cdr (assoc :message
-	      (cdr (assoc :messages
-			  (cdr (assoc :feed-message-response
-				      (cdr (assoc :response spot-json)))))))))
+  (cdr-assoc :message
+	     (cdr-assoc :messages
+			(cdr-assoc :feed-message-response
+				   (cdr-assoc :response spot-json)))))
 
 (defmethod make-location (l)
   "Turn a JSON location into a location object."
   (make-instance 'spot-point
-                 :id (cdr (assoc :id l))
-                 :messenger-id (cdr (assoc :messenger-id l))
-                 :unix-time (cdr (assoc :unix-time l))
-                 :message-type (cdr (assoc :message-type l))
-                 :lat (cdr (assoc :latitude l))
-                 :lon (cdr (assoc :longitude l))
-                 :model-id (cdr (assoc :model-id l))
-                 :show-custom-msg (cdr (assoc :show-custom-msg l))
-                 :date-time (cdr (assoc :date-time l))
-                 :battery-state (cdr (assoc :battery-state l))
-                 :hidden (cdr (assoc :hidden l))
+                 :id (cdr-assoc :id l)
+                 :messenger-id (cdr-assoc :messenger-id l)
+                 :unix-time (cdr-assoc :unix-time l)
+                 :message-type (cdr-assoc :message-type l)
+                 :lat (cdr=assoc :latitude l)
+                 :lon (cdr=assoc :longitude l)
+                 :model-id (cdr-assoc :model-id l)
+                 :show-custom-msg (cdr-assoc :show-custom-msg l)
+                 :date-time (cdr-assoc :date-time l)
+                 :battery-state (cdr-assoc :battery-state l)
+                 :hidden (cdr-assoc :hidden l)
 		 :creation-source point-spot
                  ))
 
@@ -163,7 +175,8 @@ from the Spot API."
 
 (defun spot-street-address (spot google-api-key)
   "Convert a spot location into a street address."
-  (geocode:extract-street-address-from-json (lookup-location spot google-api-key)))
+  (geocode:extract-street-address-from-json
+   (lookup-location spot google-api-key)))
 
 (defun create-location-objects-from-list (location-list)
   "Takes a list of JSON locations (usually
@@ -197,7 +210,10 @@ objects."
 (defun start-spot (feed-glld feed-passwd)
   "Start the thread that reads the latest API data from spot.com every
 2.5 minutes. This keeps the *spots* list up-to-date."
-  (setf *uptodate-thread* (bt:make-thread (lambda () (up-to-dater feed-glld feed-passwd)) :name "up-to-dater"))
+  (setf *uptodate-thread*
+	(bt:make-thread
+	 (lambda ()
+	   (up-to-dater feed-glld feed-passwd)) :name "up-to-dater"))
   (format t "spot update thread is running...~%"))
 
 (defun get-all-spots-local ()
