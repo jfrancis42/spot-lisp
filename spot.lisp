@@ -12,7 +12,7 @@
 times when doing API stuff."
   `(cdr (assoc ,name ,alist :test #'equal)))
 
-;;  Descendant of aviation-formlary's 2d-point.  Adds fields for SPOT
+;;  Descendant of aviation-formulary's 2d-point.  Adds fields for SPOT
 ;;  service.
 (defclass spot-point (af:2d-point)
   ((id :accessor point-id
@@ -148,8 +148,8 @@ from the Spot API."
                  :messenger-id (cdr-assoc :messenger-id l)
                  :unix-time (cdr-assoc :unix-time l)
                  :message-type (cdr-assoc :message-type l)
-                 :lat (cdr=assoc :latitude l)
-                 :lon (cdr=assoc :longitude l)
+                 :lat (cdr-assoc :latitude l)
+                 :lon (cdr-assoc :longitude l)
                  :model-id (cdr-assoc :model-id l)
                  :show-custom-msg (cdr-assoc :show-custom-msg l)
                  :date-time (cdr-assoc :date-time l)
@@ -223,3 +223,8 @@ objects."
 (defun get-newest-spot-local ()
   "Returns the newest spot (assuming the thread is running)."
   (first (last *spots*)))
+
+;;; Local Variables:
+;;; mode: Lisp
+;;; coding: utf-8
+;;; End:
