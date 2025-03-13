@@ -136,10 +136,26 @@ Accepts an optional password for password-protected location feeds."
 (defun extract-spot-locations (spot-json)
   "Extract just the location data from the parsed JSON object returned
 from the Spot API."
-  (cdr-assoc :message
-	     (cdr-assoc :messages
-			(cdr-assoc :feed-message-response
-				   (cdr-assoc :response spot-json)))))
+  (let ((count (jeff:cdr-assoc :count
+			       (jeff:cdr-assoc :feed-message-response
+					       (jeff:cdr-assoc :response spot-json)))))
+    (cond
+      ((null count)
+       nil)
+      ((= 0 count)
+       nil)
+      ((= 1 count)
+       (list
+	(cdr-assoc :message
+		   (cdr-assoc :messages
+			      (cdr-assoc :feed-message-response
+					 (cdr-assoc :response spot-json))))))
+      (t
+       (cdr-assoc :message
+		  (cdr-assoc :messages
+			     (cdr-assoc :feed-message-response
+					(cdr-assoc :response spot-json))))))))
+       
 
 (defmethod make-location (l)
   "Turn a JSON location into a location object."
@@ -201,7 +217,8 @@ objects."
        (get-spot-locations feed-glld feed-passwd)))))))
 
 (defun up-to-dater (feed-glld feed-passwd)
-  "Keep the data structure up to date."
+  "Keep the data structure up to date. This fetches new data at the
+maximum rate specified by Spot (every 2.5 minutes)."
   (loop
      (bt:with-lock-held (*spots-lock*)
        (setf *spots* (get-all-spots-api feed-glld feed-passwd)))
@@ -228,3 +245,5 @@ objects."
 ;;; mode: Lisp
 ;;; coding: utf-8
 ;;; End:
+
+;; ?startDate=2012-07-03T00:00:00-0000&endDate=2012-08-02T00:00:00-0000

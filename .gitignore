@@ -2,4 +2,7 @@
 *.kml
 .DS_Store
 example_client
-
+notes.txt
+spot-alert.lisp
+spot-alert.lisp.orig
+spot-files.lisp
